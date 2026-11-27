@@ -16,14 +16,19 @@ function baseUrl(): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Resolve configuration outside the try/catch so a missing base URL is not
+  // misreported as a network failure.
+  const url = `${baseUrl()}${path}`
   let response: Response
   try {
-    response = await fetch(`${baseUrl()}${path}`, {
+    response = await fetch(url, {
       ...init,
       headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     })
   } catch {
-    throw new ApiRequestError('API unreachable. Check that the backend is running.')
+    throw new ApiRequestError(
+      'API unreachable. Check that the backend is running and that this origin is allowed by CORS.'
+    )
   }
 
   if (!response.ok) {

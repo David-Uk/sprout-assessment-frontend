@@ -32,6 +32,15 @@ describe('API client', () => {
     await expect(createTask({ title: 'Test task' })).rejects.toThrow(/API unreachable/i)
   })
 
+  it('reports a missing base URL as a configuration error, not a network failure', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', '')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getTasks()).rejects.toThrow(/VITE_API_BASE_URL is not configured/i)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('uses the API error message for a bad request', async () => {
     vi.stubGlobal(
       'fetch',

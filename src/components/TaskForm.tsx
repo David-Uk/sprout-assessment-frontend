@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { memo, useState, type FormEvent } from 'react'
 import type { CreateTaskInput, Status } from '../types'
 import { STATUS_LABELS } from '../types'
 
@@ -7,7 +7,7 @@ interface Props {
   busy: boolean
 }
 
-export default function TaskForm({ onSubmit, busy }: Props) {
+function TaskForm({ onSubmit, busy }: Props) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<Status>('pending')
@@ -91,3 +91,5 @@ export default function TaskForm({ onSubmit, busy }: Props) {
     </form>
   )
 }
+
+export default memo(TaskForm)

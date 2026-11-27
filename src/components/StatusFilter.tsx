@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { StatusFilter as Filter } from '../types'
 import { STATUS_LABELS } from '../types'
 
@@ -9,7 +10,7 @@ interface Props {
   disabled?: boolean
 }
 
-export default function StatusFilter({ value, onChange, disabled = false }: Props) {
+function StatusFilter({ value, onChange, disabled = false }: Props) {
   return (
     <fieldset className="filter" disabled={disabled}>
       <legend>Filter by status</legend>
@@ -30,3 +31,5 @@ export default function StatusFilter({ value, onChange, disabled = false }: Prop
     </fieldset>
   )
 }
+
+export default memo(StatusFilter)
