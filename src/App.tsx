@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createTask, getTasks, updateTaskStatus } from './api/client'
 import StatusFilter from './components/StatusFilter'
 import TaskForm from './components/TaskForm'
@@ -10,6 +10,10 @@ function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
+function matchesFilter(task: Task, filter: Filter): boolean {
+  return filter === 'all' || task.status === filter
+}
+
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [filter, setFilter] = useState<Filter>('all')
@@ -18,11 +22,17 @@ export default function App() {
   const [updatingId, setUpdatingId] = useState<Task['id'] | null>(null)
   const [error, setError] = useState('')
 
+  // Refs keep the callbacks stable, so memoized children do not rerender when
+  // only unrelated App state changes.
+  const filterRef = useRef<Filter>(filter)
+  const creatingRef = useRef(false)
+  const updatingIdRef = useRef<Task['id'] | null>(null)
+
   const loadTasks = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const result = await getTasks(filter === 'all' ? undefined : filter)
+      const result = await getTasks(filterRef.current === 'all' ? undefined : filterRef.current)
       setTasks(result.data)
     } catch (err) {
       setTasks([])
@@ -30,42 +40,60 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [])
 
   useEffect(() => {
     // Defer so the filter change renders before the loading state is set.
     void Promise.resolve().then(loadTasks)
-  }, [loadTasks])
+  }, [filter, loadTasks])
 
-  async function handleCreate(input: CreateTaskInput) {
-    if (creating) return
+  const handleFilterChange = useCallback((value: Filter) => {
+    filterRef.current = value
+    setFilter(value)
+  }, [])
+
+  const handleCreate = useCallback(async (input: CreateTaskInput) => {
+    if (creatingRef.current) return
+    creatingRef.current = true
     setCreating(true)
     setError('')
     try {
-      await createTask(input)
-      await loadTasks()
+      const { data } = await createTask(input)
+      // Insert just the new task instead of refetching the whole list.
+      setTasks((prev) => (matchesFilter(data, filterRef.current) ? [data, ...prev] : prev))
     } catch (err) {
       const message = messageOf(err, 'Could not create the task.')
       setError(message)
       throw err
     } finally {
+      creatingRef.current = false
       setCreating(false)
     }
-  }
+  }, [])
 
-  async function handleStatusChange(task: Task, status: Status) {
-    if (updatingId !== null) return
+  const handleStatusChange = useCallback(async (task: Task, status: Status) => {
+    if (updatingIdRef.current !== null) return
+    updatingIdRef.current = task.id
     setUpdatingId(task.id)
     setError('')
     try {
-      await updateTaskStatus(task.id, status)
-      await loadTasks()
+      const { data } = await updateTaskStatus(task.id, status)
+      // Replace only the updated task; untouched task objects keep their
+      // identity so their memoized cards skip rendering.
+      setTasks((prev) =>
+        prev.flatMap((item) => {
+          if (item.id !== task.id) return [item]
+          const updated: Task = { ...item, ...data }
+          return matchesFilter(updated, filterRef.current) ? [updated] : []
+        })
+      )
     } catch (err) {
       setError(messageOf(err, 'Could not update the task.'))
     } finally {
+      updatingIdRef.current = null
       setUpdatingId(null)
     }
-  }
+  }, [])
 
   return (
     <div className="app">
@@ -78,7 +106,7 @@ export default function App() {
         <section className="tasks-panel" aria-labelledby="tasks-heading">
           <div className="tasks-toolbar">
             <h2 id="tasks-heading">Tasks</h2>
-            <StatusFilter value={filter} onChange={setFilter} disabled={loading} />
+            <StatusFilter value={filter} onChange={handleFilterChange} disabled={loading} />
           </div>
           <div className="notifications" aria-live="polite">
             {error && (

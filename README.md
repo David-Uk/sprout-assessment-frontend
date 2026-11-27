@@ -13,6 +13,8 @@ library.
 ## Features
 
 - Task list fetched from `GET /api/tasks`, newest first
+- Local state updates for create/status change: only the affected card rerenders, with no full-list
+  refetch (the list is refetched only on initial load and filter changes)
 - Create form with client-side validation (title 1–150, description ≤1000)
 - Per-task status dropdown using `PATCH /api/tasks/:id/status`
 - Status filter: All / Pending / In Progress / Completed
@@ -59,7 +61,11 @@ npm run lint      # ESLint
 npm test          # Vitest + React Testing Library
 ```
 
-If not using the dev proxy, make sure the API's `CORS_ORIGIN` includes `http://localhost:5173`.
+If not using the dev proxy, make sure the API's `CORS_ORIGIN` includes the origin shown in Vite's
+output. Vite moves to the next free port when 5173 is busy (e.g. `http://localhost:5174`); the API
+already accepts any localhost origin in development, so no change is needed locally. If a fetch is
+blocked by CORS, the client shows "API unreachable" — check the browser console and the API's CORS
+allow-list.
 
 ## Project structure
 
@@ -68,12 +74,14 @@ src/
 ├── api/client.ts           # all fetch calls + error normalisation
 ├── components/
 │   ├── StatusFilter.tsx
+│   ├── TaskCard.tsx        # memoised row; only changed tasks rerender
 │   ├── TaskForm.tsx
 │   └── TaskList.tsx
 ├── test/
 │   ├── setup.ts            # jest-dom matchers + RTL cleanup
 │   ├── apiClient.test.ts
-│   └── App.test.tsx
+│   ├── App.test.tsx
+│   └── rerender.test.tsx   # render-count + no-refetch checks
 ├── App.tsx / App.css       # layout and state orchestration
 ├── index.css               # global reset and focus styles
 ├── types.ts                # Task, Status and shared types
